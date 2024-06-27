@@ -15,11 +15,6 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// 로그인 페이지
-app.get('/login', (req, res) => {
-  res.send('<form action="/login" method="post">Email: <input type="text" name="email"/><br>Password: <input type="password" name="password"/><br><button type="submit">Login</button></form>');
-});
-
 // 로그인 처리
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
