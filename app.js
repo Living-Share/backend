@@ -16,7 +16,8 @@ db.serialize(() => {
     email TEXT UNIQUE,
     password TEXT,
     description TEXT,
-    phone TEXT
+    phone TEXT,
+    money BOOLEAN DEFAULT 0
   )`);
 
   db.run(`CREATE TABLE events (
@@ -31,11 +32,12 @@ db.serialize(() => {
 
   // 사용자 데이터 추가
   db.run(`INSERT INTO users (name, email, password) VALUES ('김철수', 'kimcheolsu@example.com', 'password')`);
-  db.run(`INSERT INTO users (name, email, password) VALUES ('이영희', 'leeyounghee@example.com', 'password')`);
+  db.run(`INSERT INTO users (name, email, password) VALUES ('박영희', 'parkyounghee@example.com', 'password')`);
 
   // 이벤트 데이터 추가
   db.run(`INSERT INTO events (user_id, event, day, time, type) VALUES (1, '회사 모임', '2024-07-01', '14:00', '회식')`);
   db.run(`INSERT INTO events (user_id, event, day, time, type) VALUES (1, '프로젝트 회의', '2024-07-03', '10:00', '업무')`);
+  db.run(`INSERT INTO events (user_id, event, day, time, type) VALUES (2, '친구 모임', '2024-07-05', '18:00', '친목')`);
 });
 
 // 이벤트 조회
@@ -51,72 +53,77 @@ app.get('/event', (req, res) => {
   });
 });
 
-// 이벤트 등록 처리
-app.post('/event/register', (req, res) => {
-  const { event, day, time, type, userId } = req.body;
-
-  db.run(
-    'INSERT INTO events (user_id, event, day, time, type) VALUES (?, ?, ?, ?, ?)',
-    [userId, event, day, time, type],
-    function (err) {
-      if (err) {
-        console.error('Error inserting event:', err.message);
-        return res.status(500).json({ error: '이벤트 등록 중 오류가 발생했습니다.' });
-      }
-
-      // 등록된 이벤트의 사용자 이름 조회
-      db.get('SELECT name FROM users WHERE id = ?', [userId], (err, row) => {
-        if (err) {
-          console.error('Error fetching user:', err.message);
-          return res.status(500).json({ error: '사용자 조회 중 오류가 발생했습니다.' });
-        }
-
-        const userName = row ? row.name : 'Unknown';
-        res.status(200).json({ message: '이벤트 등록 성공!', userName });
-      });
-    }
-  );
-});
-
-// 사용자 정보 수정 처리
-app.put('/user/:id', (req, res) => {
-  const userId = req.params.id;
-  const { name, phone } = req.body;
-
-  db.run(
-    'UPDATE users SET description = ?, phone = ? WHERE id = ?',
-    [name, phone, userId],
-    function (err) {
-      if (err) {
-        console.error('Error updating user:', err.message);
-        return res.status(500).json({ error: '사용자 정보 수정 중 오류가 발생했습니다.' });
-      }
-
-      if (this.changes === 0) {
-        return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-      }
-
-      res.status(200).json({ message: '사용자 정보 수정 성공!' });
-    }
-  );
-});
-
+// 사용자 정보 조회
 app.get('/user/:id', (req, res) => {
   const userId = req.params.id;
 
-  db.get('SELECT * FROM users WHERE id = ?', [userId], (err, row) => {
+  db.get('SELECT * FROM users WHERE id = ?', [userId], (err, user) => {
     if (err) {
       console.error('Error fetching user:', err.message);
       return res.status(500).json({ error: '사용자 정보 조회 중 오류가 발생했습니다.' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
+
+    res.status(200).json(user);
+  });
+});
+
+// 사용자 money 상태 업데이트
+app.put('/user/:id/money', (req, res) => {
+  const userId = req.params.id;
+
+  // 현재 money 상태 조회
+  db.get('SELECT money FROM users WHERE id = ?', [userId], (err, row) => {
+    if (err) {
+      console.error('Error fetching user money:', err.message);
+      return res.status(500).json({ error: '사용자 money 상태 조회 중 오류가 발생했습니다.' });
     }
 
     if (!row) {
       return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
     }
 
-    res.status(200).json({ message: row });
+    // 현재 money 상태를 반전하여 업데이트
+    const newMoneyState = row.money === 0 ? 1 : 0;
+
+    db.run(
+      'UPDATE users SET money = ? WHERE id = ?',
+      [newMoneyState, userId],
+      function (err) {
+        if (err) {
+          console.error('Error updating user money:', err.message);
+          return res.status(500).json({ error: '사용자 money 상태 업데이트 중 오류가 발생했습니다.' });
+        }
+
+        if (this.changes === 0) {
+          return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+        }
+
+        res.status(200).json({ message: '사용자 money 상태가 업데이트되었습니다.', newMoneyState });
+      }
+    );
   });
-}); 
+});
+
+// 사용자 정보 조회
+app.get('/user', (req, res) => {
+
+  db.get('SELECT * FROM users', (err, user) => {
+    if (err) {
+      console.error('Error fetching user:', err.message);
+      return res.status(500).json({ error: '사용자 정보 조회 중 오류가 발생했습니다.' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
+
+    res.status(200).json(user);
+  });
+});
 
 // 서버 시작
 const port = 3000;
