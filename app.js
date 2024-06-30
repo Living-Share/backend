@@ -53,13 +53,13 @@ db.serialize(() => {
 
   // 이벤트 데이터 추가 (수정된 부분: user_id 컬럼 추가)
   db.run(
-    `INSERT INTO events (user_id, event, day, time, type) VALUES (1, '회사 모임', '2024-07-01', '14:00', '회식')`
+    `INSERT INTO events (user_id, event, day, time, type) VALUES (1, '일정등록', '2024-06-29', '14:00', '회식')`
   );
   db.run(
-    `INSERT INTO events (user_id, event, day, time, type) VALUES (1, '프로젝트 회의', '2024-07-03', '10:00', '업무')`
+    `INSERT INTO events (user_id, event, day, time, type) VALUES (1, '집안일', '2024-07-03', '10:00', '업무')`
   );
   db.run(
-    `INSERT INTO events (user_id, event, day, time, type) VALUES (2, '친구 모임', '2024-07-05', '18:00', '친목')`
+    `INSERT INTO events (user_id, event, day, time, type) VALUES (2, '일정등록', '2024-07-05', '18:00', '친목')`
   );
 
   // money 테이블 예시 데이터 추가
@@ -105,10 +105,12 @@ app.put("/user/:id", (req, res) => {
   );
 });
 
-// 이벤트 조회
 app.get("/events", (req, res) => {
   console.log("events 실행");
-  db.all("SELECT * FROM events", (err, events) => {
+
+  const today = new Date().toISOString().split("T")[0];
+
+  db.all("SELECT * FROM events WHERE day = ?", [today], (err, events) => {
     if (err) {
       console.error("Error fetching events:", err.message);
       return res
@@ -116,8 +118,30 @@ app.get("/events", (req, res) => {
         .json({ error: "이벤트 조회 중 오류가 발생했습니다." });
     }
 
-    // 조회 결과를 JSON 형식으로 반환
-    res.status(200).json(events);
+    if (events.length > 0) {
+      // 오늘의 이벤트가 있는 경우
+      return res.status(200).json(events);
+    } else {
+      // 오늘의 이벤트가 없는 경우 가장 가까운 날짜의 이벤트 조회
+      db.all(
+        "SELECT * FROM events WHERE day > ? ORDER BY day ASC LIMIT 1",
+        [today],
+        (err, closestEvents) => {
+          if (err) {
+            console.error("Error fetching closest events:", err.message);
+            return res
+              .status(500)
+              .json({ error: "이벤트 조회 중 오류가 발생했습니다." });
+          }
+
+          if (closestEvents.length > 0) {
+            return res.status(200).json(closestEvents);
+          } else {
+            return res.status(404).json({ error: "이벤트가 없습니다." });
+          }
+        }
+      );
+    }
   });
 });
 
