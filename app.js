@@ -7,7 +7,7 @@ const db = new sqlite3.Database(":memory:");
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-const cors = require('cors');
+const cors = require("cors");
 app.use(cors());
 
 // 데이터베이스 초기화
@@ -66,52 +66,73 @@ db.serialize(() => {
   db.run(
     `INSERT INTO money (electricity, water, gas, heating, management_fee) VALUES (?, ?, ?, ?, ?)`,
     [10000, 20000, 15000, 12000, 30000],
-    function(err) {
+    function (err) {
       if (err) {
-        console.error('Error inserting money data:', err.message);
+        console.error("Error inserting money data:", err.message);
         return;
       }
-      console.log('Money data inserted successfully');
+      console.log("Money data inserted successfully");
     }
   );
 });
 
-// 나머지 코드는 그대로 유지
+// 사용자 정보 업데이트
+app.put("/user/:id", (req, res) => {
+  const userId = req.params.id;
+  const { email, phone } = req.body;
+
+  db.run(
+    "UPDATE users SET email = ?, phone = ? WHERE id = ?",
+    [email, phone, userId],
+    function (err) {
+      if (err) {
+        console.error("Error updating user information:", err.message);
+        return res
+          .status(500)
+          .json({ error: "사용자 정보 업데이트 중 오류가 발생했습니다." });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+      }
+
+      res.status(200).json({
+        message: "사용자 정보가 업데이트되었습니다.",
+        email,
+        phone,
+      });
+    }
+  );
+});
 
 // 이벤트 조회
 app.get("/events", (req, res) => {
   console.log("events 실행");
-  db.all(
-    "SELECT * FROM events",
-    (err, events) => {
-      if (err) {
-        console.error("Error fetching events:", err.message);
-        return res
-          .status(500)
-          .json({ error: "이벤트 조회 중 오류가 발생했습니다." });
-      }
-
-      // 조회 결과를 JSON 형식으로 반환
-      res.status(200).json(events);
+  db.all("SELECT * FROM events", (err, events) => {
+    if (err) {
+      console.error("Error fetching events:", err.message);
+      return res
+        .status(500)
+        .json({ error: "이벤트 조회 중 오류가 발생했습니다." });
     }
-  );
+
+    // 조회 결과를 JSON 형식으로 반환
+    res.status(200).json(events);
+  });
 });
 
 // 사용자의 비용 정보 조회
 app.get("/getMoney", (req, res) => {
-  db.all(
-    `SELECT * FROM money`,
-    (err, rows) => {
-      if (err) {
-        console.error("Error fetching money information:", err.message);
-        return res
-          .status(500)
-          .json({ error: "비용 정보 조회 중 오류가 발생했습니다." });
-      }
-
-      res.status(200).json(rows);
+  db.all(`SELECT * FROM money`, (err, rows) => {
+    if (err) {
+      console.error("Error fetching money information:", err.message);
+      return res
+        .status(500)
+        .json({ error: "비용 정보 조회 중 오류가 발생했습니다." });
     }
-  );
+
+    res.status(200).json(rows);
+  });
 });
 
 // 사용자 정보 조회
@@ -133,6 +154,8 @@ app.get("/user/:id", (req, res) => {
     res.status(200).json(user);
   });
 });
+
+app.put("user/:id", (req, res) => {});
 
 // 사용자 money 상태 업데이트
 app.put("/user/:id/money", (req, res) => {
@@ -160,23 +183,19 @@ app.put("/user/:id/money", (req, res) => {
       function (err) {
         if (err) {
           console.error("Error updating user money:", err.message);
-          return res
-            .status(500)
-            .json({
-              error: "사용자 money 상태 업데이트 중 오류가 발생했습니다.",
-            });
+          return res.status(500).json({
+            error: "사용자 money 상태 업데이트 중 오류가 발생했습니다.",
+          });
         }
 
         if (this.changes === 0) {
           return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
         }
 
-        res
-          .status(200)
-          .json({
-            message: "사용자 money 상태가 업데이트되었습니다.",
-            newMoneyState,
-          });
+        res.status(200).json({
+          message: "사용자 money 상태가 업데이트되었습니다.",
+          newMoneyState,
+        });
       }
     );
   });
@@ -208,23 +227,19 @@ app.put("/events/:id/doEvent", (req, res) => {
       function (err) {
         if (err) {
           console.error("Error updating event doevent state:", err.message);
-          return res
-            .status(500)
-            .json({
-              error: "이벤트 doevent 상태 업데이트 중 오류가 발생했습니다.",
-            });
+          return res.status(500).json({
+            error: "이벤트 doevent 상태 업데이트 중 오류가 발생했습니다.",
+          });
         }
 
         if (this.changes === 0) {
           return res.status(404).json({ error: "이벤트를 찾을 수 없습니다." });
         }
 
-        res
-          .status(200)
-          .json({
-            message: "이벤트 doevent 상태가 업데이트되었습니다.",
-            newDoEventState,
-          });
+        res.status(200).json({
+          message: "이벤트 doevent 상태가 업데이트되었습니다.",
+          newDoEventState,
+        });
       }
     );
   });
