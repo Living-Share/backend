@@ -33,6 +33,14 @@ db.serialize(() => {
     FOREIGN KEY (user_id) REFERENCES users (id)
   )`);
 
+  db.run(`CREATE TABLE homeworks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    event TEXT,
+    doevent BOOLEAN DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+  )`);
+
   // money 테이블 생성
   db.run(`CREATE TABLE money (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,6 +69,10 @@ db.serialize(() => {
   db.run(
     `INSERT INTO events (user_id, event, day, time, type) VALUES (2, '일정등록', '2024-07-05', '18:00', '친목')`
   );
+
+  db.run(`INSERT INTO homeworks (user_id, event) VALUES (1, '퐁퐁하기')`);
+
+  db.run(`INSERT INTO homeworks (user_id, event) VALUES (2, '빨래하기')`);
 
   // money 테이블 예시 데이터 추가
   db.run(
@@ -110,7 +122,13 @@ app.get("/events", (req, res) => {
 
   const today = new Date().toISOString().split("T")[0];
 
-  db.all("SELECT * FROM events WHERE day = ?", [today], (err, events) => {
+  const getEventsQuery = `
+    SELECT events.*, users.name AS user_name
+    FROM events
+    JOIN users ON events.user_id = users.id
+    WHERE events.day = ?`;
+
+  db.all(getEventsQuery, [today], (err, events) => {
     if (err) {
       console.error("Error fetching events:", err.message);
       return res
@@ -123,24 +141,28 @@ app.get("/events", (req, res) => {
       return res.status(200).json(events);
     } else {
       // 오늘의 이벤트가 없는 경우 가장 가까운 날짜의 이벤트 조회
-      db.all(
-        "SELECT * FROM events WHERE day > ? ORDER BY day ASC LIMIT 1",
-        [today],
-        (err, closestEvents) => {
-          if (err) {
-            console.error("Error fetching closest events:", err.message);
-            return res
-              .status(500)
-              .json({ error: "이벤트 조회 중 오류가 발생했습니다." });
-          }
+      const getClosestEventsQuery = `
+        SELECT events.*, users.name AS user_name
+        FROM events
+        JOIN users ON events.user_id = users.id
+        WHERE events.day > ?
+        ORDER BY events.day ASC
+        LIMIT 1`;
 
-          if (closestEvents.length > 0) {
-            return res.status(200).json(closestEvents);
-          } else {
-            return res.status(404).json({ error: "이벤트가 없습니다." });
-          }
+      db.all(getClosestEventsQuery, [today], (err, closestEvents) => {
+        if (err) {
+          console.error("Error fetching closest events:", err.message);
+          return res
+            .status(500)
+            .json({ error: "이벤트 조회 중 오류가 발생했습니다." });
         }
-      );
+
+        if (closestEvents.length > 0) {
+          return res.status(200).json(closestEvents);
+        } else {
+          return res.status(404).json({ error: "이벤트가 없습니다." });
+        }
+      });
     }
   });
 });
@@ -226,47 +248,92 @@ app.put("/user/:id/money", (req, res) => {
 });
 
 // 이벤트 doevent 상태 업데이트
-app.put("/events/:id/doEvent", (req, res) => {
+app.put("/homeworks/:id/doEvent", (req, res) => {
   const eventId = req.params.id;
 
   // 현재 doevent 상태 조회
-  db.get("SELECT doevent FROM events WHERE id = ?", [eventId], (err, row) => {
-    if (err) {
-      console.error("Error fetching event doevent state:", err.message);
-      return res
-        .status(500)
-        .json({ error: "이벤트 doevent 상태 조회 중 오류가 발생했습니다." });
-    }
+  db.get(
+    "SELECT doevent FROM homeworks WHERE id = ?",
+    [eventId],
+    (err, row) => {
+      if (err) {
+        console.error("Error fetching event doevent state:", err.message);
+        return res
+          .status(500)
+          .json({ error: "이벤트 doevent 상태 조회 중 오류가 발생했습니다." });
+      }
 
-    if (!row) {
-      return res.status(404).json({ error: "이벤트를 찾을 수 없습니다." });
-    }
+      if (!row) {
+        return res.status(404).json({ error: "이벤트를 찾을 수 없습니다." });
+      }
 
-    // 현재 doevent 상태를 반전하여 업데이트
-    const newDoEventState = row.doevent === 0 ? 1 : 0;
+      // 현재 doevent 상태를 반전하여 업데이트
+      const newDoEventState = row.doevent === 0 ? 1 : 0;
 
-    db.run(
-      "UPDATE events SET doevent = ? WHERE id = ?",
-      [newDoEventState, eventId],
-      function (err) {
-        if (err) {
-          console.error("Error updating event doevent state:", err.message);
-          return res.status(500).json({
-            error: "이벤트 doevent 상태 업데이트 중 오류가 발생했습니다.",
+      db.run(
+        "UPDATE homeworks SET doevent = ? WHERE id = ?",
+        [newDoEventState, eventId],
+        function (err) {
+          if (err) {
+            console.error("Error updating event doevent state:", err.message);
+            return res.status(500).json({
+              error: "이벤트 doevent 상태 업데이트 중 오류가 발생했습니다.",
+            });
+          }
+
+          if (this.changes === 0) {
+            return res
+              .status(404)
+              .json({ error: "이벤트를 찾을 수 없습니다." });
+          }
+
+          res.status(200).json({
+            message: "이벤트 doevent 상태가 업데이트되었습니다.",
+            newDoEventState,
           });
         }
+      );
+    }
+  );
+});
 
-        if (this.changes === 0) {
-          return res.status(404).json({ error: "이벤트를 찾을 수 없습니다." });
-        }
+// Homework 추가
+app.post("/homeworks", (req, res) => {
+  const { user_id, event } = req.body;
 
-        res.status(200).json({
-          message: "이벤트 doevent 상태가 업데이트되었습니다.",
-          newDoEventState,
-        });
+  db.run(
+    `INSERT INTO homeworks (user_id, event) VALUES (?, ?)`,
+    [user_id, event],
+    function (err) {
+      if (err) {
+        console.error("Error inserting homework:", err.message);
+        return res
+          .status(500)
+          .json({ error: "Homework 추가 중 오류가 발생했습니다." });
       }
-    );
-  });
+      res
+        .status(201)
+        .json({ message: "Homework가 추가되었습니다.", id: this.lastID });
+    }
+  );
+});
+
+// Homework 조회
+app.get("/homeworks", (req, res) => {
+  db.all(
+    `SELECT homeworks.*, users.name AS user_name 
+    FROM homeworks 
+    INNER JOIN users ON homeworks.user_id = users.id`,
+    (err, rows) => {
+      if (err) {
+        console.error("Error fetching homeworks:", err.message);
+        return res
+          .status(500)
+          .json({ error: "Homework 조회 중 오류가 발생했습니다." });
+      }
+      res.status(200).json(rows);
+    }
+  );
 });
 
 // 서버 시작
