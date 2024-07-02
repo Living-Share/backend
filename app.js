@@ -67,6 +67,10 @@ db.serialize(() => {
     `INSERT INTO events (user_id, event, day, time, type) VALUES (2, '일정등록', '2024-07-05', '18:00', '친목')`
   );
 
+  db.run(
+    `INSERT INTO events (user_id, event, day, time, type) VALUES (1, '일정등록', '2024-07-05', '18:00', '엄')`
+  );
+
   db.run(`INSERT INTO homeworks (user_id, event) VALUES (1, '설거지하기')`);
 
   db.run(`INSERT INTO homeworks (user_id, event) VALUES (2, '빨래하기')`);
@@ -118,7 +122,6 @@ app.get("/events", (req, res) => {
   console.log("events 실행");
 
   const today = new Date().toISOString().split("T")[0];
-
   console.log(today);
 
   const getEventsQuery = `
@@ -139,28 +142,46 @@ app.get("/events", (req, res) => {
       // 오늘의 이벤트가 있는 경우
       return res.status(200).json(events);
     } else {
-      // 오늘의 이벤트가 없는 경우 가장 가까운 날짜의 이벤트 조회
-      const getClosestEventsQuery = `
-        SELECT events.*, users.name AS user_name
+      // 오늘의 이벤트가 없는 경우 가장 가까운 날짜의 모든 이벤트 조회
+      const getClosestEventDayQuery = `
+        SELECT DISTINCT day
         FROM events
-        JOIN users ON events.user_id = users.id
         WHERE events.day > ?
         ORDER BY events.day ASC
         LIMIT 1`;
 
-      db.all(getClosestEventsQuery, [today], (err, closestEvents) => {
+      db.get(getClosestEventDayQuery, [today], (err, closestEvent) => {
         if (err) {
-          console.error("Error fetching closest events:", err.message);
+          console.error("Error fetching closest event day:", err.message);
           return res
             .status(500)
             .json({ error: "이벤트 조회 중 오류가 발생했습니다." });
         }
 
-        if (closestEvents.length > 0) {
-          return res.status(200).json(closestEvents);
-        } else {
+        if (!closestEvent) {
           return res.status(404).json({ error: "이벤트가 없습니다." });
         }
+
+        const getClosestEventsQuery = `
+          SELECT events.*, users.name AS user_name
+          FROM events
+          JOIN users ON events.user_id = users.id
+          WHERE events.day = ?`;
+
+        db.all(
+          getClosestEventsQuery,
+          [closestEvent.day],
+          (err, closestEvents) => {
+            if (err) {
+              console.error("Error fetching closest events:", err.message);
+              return res
+                .status(500)
+                .json({ error: "이벤트 조회 중 오류가 발생했습니다." });
+            }
+
+            return res.status(200).json(closestEvents);
+          }
+        );
       });
     }
   });
@@ -192,9 +213,7 @@ app.get("/test", (req, res) => {
   db.all(`SELECT * FROM events`, (err, rows) => {
     if (err) {
       console.error("Error fetching money information:", err.message);
-      return res
-        .status(500)
-        .json({ error: "test 문제 발생했습니다." });
+      return res.status(500).json({ error: "test 문제 발생했습니다." });
     }
 
     res.status(200).json(rows);
