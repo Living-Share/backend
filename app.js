@@ -64,13 +64,10 @@ db.serialize(() => {
     `INSERT INTO events (user_id, event, day, time, type) VALUES (1, '일정등록', '2024-06-29', '14:00', '회식')`
   );
   db.run(
-    `INSERT INTO events (user_id, event, day, time, type) VALUES (1, '집안일', '2024-07-03', '10:00', '업무')`
-  );
-  db.run(
     `INSERT INTO events (user_id, event, day, time, type) VALUES (2, '일정등록', '2024-07-05', '18:00', '친목')`
   );
 
-  db.run(`INSERT INTO homeworks (user_id, event) VALUES (1, '퐁퐁하기')`);
+  db.run(`INSERT INTO homeworks (user_id, event) VALUES (1, '설거지하기')`);
 
   db.run(`INSERT INTO homeworks (user_id, event) VALUES (2, '빨래하기')`);
 
@@ -121,6 +118,8 @@ app.get("/events", (req, res) => {
   console.log("events 실행");
 
   const today = new Date().toISOString().split("T")[0];
+
+  console.log(today);
 
   const getEventsQuery = `
     SELECT events.*, users.name AS user_name
