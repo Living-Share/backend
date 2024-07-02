@@ -167,6 +167,41 @@ app.get("/events", (req, res) => {
   });
 });
 
+// Event 추가
+app.post("/events", (req, res) => {
+  const { user_id, event, day, time, type } = req.body;
+
+  db.run(
+    `INSERT INTO events (user_id, event, day, time, type) VALUES (?, ?, ?, ?, ?)`,
+    [user_id, event, day, time, type],
+    function (err) {
+      if (err) {
+        console.error("Error inserting event:", err.message);
+        return res
+          .status(500)
+          .json({ error: "Event 추가 중 오류가 발생했습니다." });
+      }
+      res
+        .status(201)
+        .json({ message: "Event가 추가되었습니다.", id: this.lastID });
+    }
+  );
+});
+
+// test
+app.get("/test", (req, res) => {
+  db.all(`SELECT * FROM events`, (err, rows) => {
+    if (err) {
+      console.error("Error fetching money information:", err.message);
+      return res
+        .status(500)
+        .json({ error: "test 문제 발생했습니다." });
+    }
+
+    res.status(200).json(rows);
+  });
+});
+
 // 사용자의 비용 정보 조회
 app.get("/getMoney", (req, res) => {
   db.all(`SELECT * FROM money`, (err, rows) => {
@@ -259,7 +294,7 @@ app.put("/user/:id/money", (req, res) => {
   });
 });
 
-// 이벤트 doevent 상태 업데이트
+// homework doevent 상태 업데이트
 app.put("/homeworks/:id/doEvent", (req, res) => {
   const eventId = req.params.id;
 
