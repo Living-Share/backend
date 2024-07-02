@@ -181,6 +181,20 @@ app.get("/getMoney", (req, res) => {
   });
 });
 
+// 사용자의 비용 정보 조회
+app.get("/user", (req, res) => {
+  db.all(`SELECT * FROM users`, (err, rows) => {
+    if (err) {
+      console.error("Error fetching money information:", err.message);
+      return res
+        .status(500)
+        .json({ error: "유저 정보 조회 중 오류가 발생했습니다." });
+    }
+
+    res.status(200).json(rows);
+  });
+});
+
 // 사용자 정보 조회
 app.get("/user/:id", (req, res) => {
   const userId = req.params.id;
@@ -200,8 +214,6 @@ app.get("/user/:id", (req, res) => {
     res.status(200).json(user);
   });
 });
-
-app.put("user/:id", (req, res) => {});
 
 // 사용자 money 상태 업데이트
 app.put("/user/:id/money", (req, res) => {
